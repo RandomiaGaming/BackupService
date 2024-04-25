@@ -98,7 +98,7 @@ namespace BackupService
         {
             // Run git backup commands if this is a git repo.
             bool gitCommit = false; // Don't run git commands by default.
-            if(subPath.Length == 0 && Directory.Exists(source + ".git"))
+            if (subPath.Length == 0 && Directory.Exists(source + ".git"))
             {
                 gitCommit = true; // Run git commands if the folder is a git repo.
             }
@@ -248,17 +248,18 @@ namespace BackupService
             processStartInfo.RedirectStandardOutput = true; // Redirect standard output
             processStartInfo.RedirectStandardError = true; // Redirect standard error
             processStartInfo.UseShellExecute = false; // Don't use the shell to execute the command
-//            processStartInfo.CreateNoWindow = true; // Don't create a window
+            processStartInfo.CreateNoWindow = true; // Don't create a window
 
             // Run process and get output.
             Process process = Process.Start(processStartInfo);
             string output = process.StandardOutput.ReadToEnd();
-           string error = process.StandardError.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
             process.WaitForExit();
 
-            if(error.Length > 0 && !error.StartsWith("Everything up-to-date"))
+            if (error.Length > 0 && !error.StartsWith("Everything up-to-date"))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Git error for repo at \"{workingDirectory}\".");
                 Console.WriteLine(error);
                 Console.ForegroundColor = ConsoleColor.White;
             }
