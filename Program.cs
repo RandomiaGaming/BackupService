@@ -108,10 +108,10 @@ namespace BackupService
             }
             if (gitCommit)
             {
-                string out1 = RunCommand("git rm --cached -r *", source + subPath);
-                string out2 = RunCommand("git add *", source + subPath);
-                string out3 = RunCommand("git commit -m\"Backup Commit\"", source + subPath);
-                string out4 = RunCommand("git push origin --all", source + subPath);
+                RunGitCommand("rm --cached -r *", source + subPath);
+                RunGitCommand("add *", source + subPath);
+                RunGitCommand("commit -m\"Backup Commit\"", source + subPath);
+                RunGitCommand("push origin --all", source + subPath);
             }
 
             // Recursively check sub folders.
@@ -234,7 +234,7 @@ namespace BackupService
 
         // Approved 1
         // Runs a cmd command in a certain working directory.
-        public static string RunCommand(string command, string workingDirectory)
+        public static void RunGitCommand(string command, string workingDirectory)
         {
             if (workingDirectory.StartsWith("\\\\?\\"))
             {
@@ -242,8 +242,8 @@ namespace BackupService
             }
             // Create a process start info
             ProcessStartInfo processStartInfo = new ProcessStartInfo();
-            processStartInfo.FileName = "cmd.exe"; // Use cmd.exe to run the command
-            processStartInfo.Arguments = $"/c {command}"; // Pass the command to be executed
+            processStartInfo.FileName = "git"; // Use cmd.exe to run the command
+            processStartInfo.Arguments = $"{command}"; // Pass the command to be executed
             processStartInfo.WorkingDirectory = workingDirectory; // Set the working directory
             processStartInfo.RedirectStandardOutput = true; // Redirect standard output
             processStartInfo.RedirectStandardError = true; // Redirect standard error
@@ -252,13 +252,16 @@ namespace BackupService
 
             // Run process and get output.
             Process process = Process.Start(processStartInfo);
-            Console.WriteLine(process.StandardOutput.ReadToEnd());
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(process.StandardError.ReadToEnd());
-            Console.ForegroundColor = ConsoleColor.White;
+            string output = process.StandardOutput.ReadToEnd();
+           string error = process.StandardError.ReadToEnd();
             process.WaitForExit();
 
-            return "";
+            if(error.Length > 0 && !error.StartsWith("Everything up-to-date"))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(error);
+                Console.ForegroundColor = ConsoleColor.White;
+            }
         }
 
         public static void Attempt(Action action)
