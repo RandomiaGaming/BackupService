@@ -45,10 +45,6 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BackupServiceIcon.cs" />
-    <Compile Include="History.cs" />
-    <Compile Include="Console.cs" />
-    <Compile Include="Config.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
