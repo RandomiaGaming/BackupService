@@ -11,6 +11,7 @@ namespace BackupService
     {
         public static string SourceDrivePath;
         public static string DestinationDrivePath;
+        public static readonly string[] CodeExtensions = new string[] { ".c", ".cpp", ".h", ".hpp", ".vcxproj", ".cs", ".csproj", ".sln", ".java", ".py", ".js", ".html", ".css", ".htm", ".rb", ".swift", ".go", ".php", ".r", ".pl", "sh", ".bat", ".sql", ".xml", ".json", ".ts", ".kt", ".dart", ".rs" };
         public static void Main()
         {
             Console.WriteLine("It\'s Backup Time Motha Fuckers...");
@@ -21,7 +22,22 @@ namespace BackupService
             {
                 goto PressAnyKeyToExit;
             }
-            /*Console.WriteLine("Backing up files...");
+            Console.WriteLine("Scanning for code outside of git repos...");
+            if (ScanUnprotectedCode("", SourceDrivePath, DestinationDrivePath))
+            {
+                goto PressAnyKeyToExit;
+            }
+            Console.WriteLine("Validating all git repos...");
+            if (ValidateGitRepos("", SourceDrivePath, DestinationDrivePath))
+            {
+                goto PressAnyKeyToExit;
+            }
+            Console.WriteLine("Pushing all git repos...");
+            if (BackupGitRepos("", SourceDrivePath, DestinationDrivePath))
+            {
+                goto PressAnyKeyToExit;
+            }
+            Console.WriteLine("Backing up files...");
             if (Backup("", SourceDrivePath, DestinationDrivePath))
             {
                 goto PressAnyKeyToExit;
@@ -30,12 +46,9 @@ namespace BackupService
             if (Prune("", SourceDrivePath, DestinationDrivePath))
             {
                 goto PressAnyKeyToExit;
-            }*/
-            Console.WriteLine("Pushing all git repos...");
-            if (BackupGitRepos("", SourceDrivePath, DestinationDrivePath))
-            {
-                goto PressAnyKeyToExit;
             }
+            Console.WriteLine();
+            Console.WriteLine("All tasks completed successfully.");
             Console.WriteLine();
         PressAnyKeyToExit:
             Console.WriteLine("Press any key to exit...");
@@ -93,6 +106,124 @@ namespace BackupService
             return false;
         }
 
+        // Approved 1
+        // Scans through all folders for code which is not in a git repo.
+        public static bool ScanUnprotectedCode(string subPath, string source, string destination)
+        {
+            bool isRepo = false; // Assume a folder is probably not a git repo.
+            if (subPath.Length == 0 && Directory.Exists(source + ".git"))
+            {
+                isRepo = true;
+            }
+            else if (subPath.Length != 0 && Directory.Exists(source + subPath + "\\.git"))
+            {
+                isRepo = true;
+            }
+            if (isRepo)
+            {
+                return false; // Return early if this is a git repo. No sense searching furthar.
+            }
+
+            // Enumerate files in source for code.
+            foreach(string sourceFile in Directory.GetFiles(source + subPath))
+            {
+                string ext = Path.GetExtension(sourceFile);
+                bool isCode = false; // Assume files probably aren't code.
+                foreach(string codeExtension in CodeExtensions)
+                {
+                    if(ext == codeExtension)
+                    {
+                        isCode = true;
+                        break;
+                    }
+                }
+                if(isCode && !isRepo)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"Error: File \"{sourceFile}\" is code yet is not in a git repo.");
+                    Console.ForegroundColor = ConsoleColor.White;
+
+                    return false; // Don't dig any deeper.
+                }
+            }
+
+            // Recursively check sub folders.
+            foreach (string sourceFolder in Directory.GetDirectories(source + subPath))
+            {
+                bool scan = true; // Scan sub folders by default.
+                if (subPath.Length == 0 && (new DirectoryInfo(sourceFolder).Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+                {
+                    scan = false; // Don't scan hidden or system folders in the root of source.
+                }
+                if (scan)
+                {
+                    ScanUnprotectedCode(sourceFolder.Substring(source.Length), source, destination);
+                }
+            }
+
+            return false;
+        }
+
+        // Approved 1
+        // Scans through all git repos in source for .gitignores, no remote origin.
+        public static bool ValidateGitRepos(string subPath, string source, string destination)
+        {
+            // Run git backup commands if this is a git repo.
+            bool isRepo = false; // Assume a folder is probably not a git repo.
+            if (subPath.Length == 0 && Directory.Exists(source + ".git"))
+            {
+                isRepo = true;
+            }
+            else if (subPath.Length != 0 && Directory.Exists(source + subPath + "\\.git"))
+            {
+                isRepo = true;
+            }
+            if (isRepo)
+            {
+                bool hasIgnore = false; // Assume there isn't a .gitignore.
+                if (subPath.Length == 0 && File.Exists(source + ".gitignore"))
+                {
+                    hasIgnore = true;
+                }
+                else if (subPath.Length != 0 && File.Exists(source + subPath + "\\.gitignore"))
+                {
+                    hasIgnore = true;
+                }
+                if (!hasIgnore)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"Warning: Git repo in folder \"{source + subPath}\" does not have a .gitignore file.");
+                    Console.ForegroundColor = ConsoleColor.White;
+                }
+
+                bool hasOrigin = false; // Assume there is no remote origin.
+                string output = RunGitCommand("remote get-url origin", source + subPath);
+                if(output.Length == 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"Error: Git repo in folder \"{source + subPath}\" does not have a remote origin.");
+                    Console.ForegroundColor = ConsoleColor.White;
+                }
+            }
+
+            // Recursively check sub folders.
+            foreach (string sourceFolder in Directory.GetDirectories(source + subPath))
+            {
+                bool scan = true; // Scan sub folders by default.
+                if (subPath.Length == 0 && (new DirectoryInfo(sourceFolder).Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+                {
+                    scan = false; // Don't scan hidden or system folders in the root of source.
+                }
+                if (scan)
+                {
+                   ValidateGitRepos(sourceFolder.Substring(source.Length), source, destination);
+                }
+            }
+
+            return false;
+        }
+
+        // Approved 1
         // Scans through source drive for git repos and makes sure all changes are commited and pushed to remote origin.
         public static bool BackupGitRepos(string subPath, string source, string destination)
         {
@@ -132,64 +263,13 @@ namespace BackupService
         }
 
         // Approved 1
-        // Prunes files and folders from destination which have been deleted from source recursively.
-        public static bool Prune(string subPath, string source, string destination)
-        {
-            // Prune folders from backup which have been deleted from source.
-            foreach (string destinationFolder in Directory.GetDirectories(destination + subPath))
-            {
-                string sourceFolder = source + destinationFolder.Substring(destination.Length);
-                bool prune = !Directory.Exists(sourceFolder); // Prune folders which don't exist in source.
-                if (subPath.Length == 0 && (new DirectoryInfo(destinationFolder).Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
-                {
-                    prune = false; // Don't prune hidden or system folders in the root of destination.
-                }
-                if (prune)
-                {
-                    Attempt(() => { Directory.Delete(destinationFolder, true); });
-                }
-            }
-
-            // Prune files from destination which have been deleted from source.
-            foreach (string destinationFile in Directory.GetFiles(destination + subPath))
-            {
-                string sourceFile = source + destinationFile.Substring(destination.Length);
-                bool prune = !File.Exists(sourceFile); // Prune files which don't exist in source.
-                if (destinationFile == destination + "destination.backup")
-                {
-                    prune = false; // Don't prune the destination.backup file.
-                }
-                if (prune)
-                {
-                    Attempt(() => { File.Delete(destinationFile); });
-                }
-            }
-
-            // Recursively calls this method on sub folders of the current folder.
-            foreach (string destinationFolder in Directory.GetDirectories(destination + subPath))
-            {
-                bool prune = true; // Prune sub folders by default.
-                if (subPath.Length == 0 && (new DirectoryInfo(destinationFolder).Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
-                {
-                    prune = false; // Don't prune hidden or system folders in the root of destination.
-                }
-                if (prune)
-                {
-                    Prune(destinationFolder.Substring(source.Length), source, destination);
-                }
-            }
-
-            return false;
-        }
-
-        // Approved 1
         // Backs up files from source to destination which have been modified recursively.
         public static bool Backup(string subPath, string source, string destination)
         {
             // Create the destination directory if it doesn't exist already.
             if (!Directory.Exists(destination + subPath))
             {
-                Attempt(() => { Directory.CreateDirectory(destination + subPath); });
+                Directory.CreateDirectory(destination + subPath);
             }
 
             // Back up files in source.
@@ -211,7 +291,7 @@ namespace BackupService
                 }
                 if (backup)
                 {
-                    Attempt(() => { File.Copy(sourceFile, destinationFile, true); });
+                    File.Copy(sourceFile, destinationFile, true);
                 }
             }
 
@@ -233,8 +313,59 @@ namespace BackupService
         }
 
         // Approved 1
+        // Prunes files and folders from destination which have been deleted from source recursively.
+        public static bool Prune(string subPath, string source, string destination)
+        {
+            // Prune folders from backup which have been deleted from source.
+            foreach (string destinationFolder in Directory.GetDirectories(destination + subPath))
+            {
+                string sourceFolder = source + destinationFolder.Substring(destination.Length);
+                bool prune = !Directory.Exists(sourceFolder); // Prune folders which don't exist in source.
+                if (subPath.Length == 0 && (new DirectoryInfo(destinationFolder).Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+                {
+                    prune = false; // Don't prune hidden or system folders in the root of destination.
+                }
+                if (prune)
+                {
+                    Directory.Delete(destinationFolder, true);
+                }
+            }
+
+            // Prune files from destination which have been deleted from source.
+            foreach (string destinationFile in Directory.GetFiles(destination + subPath))
+            {
+                string sourceFile = source + destinationFile.Substring(destination.Length);
+                bool prune = !File.Exists(sourceFile); // Prune files which don't exist in source.
+                if (destinationFile == destination + "destination.backup")
+                {
+                    prune = false; // Don't prune the destination.backup file.
+                }
+                if (prune)
+                {
+                    File.Delete(destinationFile);
+                }
+            }
+
+            // Recursively calls this method on sub folders of the current folder.
+            foreach (string destinationFolder in Directory.GetDirectories(destination + subPath))
+            {
+                bool prune = true; // Prune sub folders by default.
+                if (subPath.Length == 0 && (new DirectoryInfo(destinationFolder).Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+                {
+                    prune = false; // Don't prune hidden or system folders in the root of destination.
+                }
+                if (prune)
+                {
+                    Prune(destinationFolder.Substring(source.Length), source, destination);
+                }
+            }
+
+            return false;
+        }
+
+        // Approved 1
         // Runs a cmd command in a certain working directory.
-        public static void RunGitCommand(string command, string workingDirectory)
+        public static string RunGitCommand(string command, string workingDirectory)
         {
             if (workingDirectory.StartsWith("\\\\?\\"))
             {
@@ -263,20 +394,8 @@ namespace BackupService
                 Console.WriteLine(error);
                 Console.ForegroundColor = ConsoleColor.White;
             }
-        }
 
-        public static void Attempt(Action action)
-        {
-            try
-            {
-                action.Invoke();
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.ForegroundColor = ConsoleColor.White;
-            }
+            return output;
         }
     }
 }
