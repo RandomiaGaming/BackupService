@@ -22,26 +22,26 @@ namespace BackupService
             {
                 goto PressAnyKeyToExit;
             }
-            Console.WriteLine("Scanning for code outside of git repos...");
-            if (ScanUnprotectedCode("", SourceDrivePath, DestinationDrivePath))
-            {
-                goto PressAnyKeyToExit;
-            }
-            Console.WriteLine("Validating all git repos...");
-            if (ValidateGitRepos("", SourceDrivePath, DestinationDrivePath))
-            {
-                goto PressAnyKeyToExit;
-            }
-            Console.WriteLine("Pushing all git repos...");
-            if (BackupGitRepos("", SourceDrivePath, DestinationDrivePath))
-            {
-                goto PressAnyKeyToExit;
-            }
-            Console.WriteLine("Backing up files...");
-            if (Backup("", SourceDrivePath, DestinationDrivePath))
-            {
-                goto PressAnyKeyToExit;
-            }
+             Console.WriteLine("Scanning for code outside of git repos...");
+             if (ScanUnprotectedCode("", SourceDrivePath, DestinationDrivePath))
+             {
+                 goto PressAnyKeyToExit;
+             }
+             Console.WriteLine("Validating all git repos...");
+             if (ValidateGitRepos("", SourceDrivePath, DestinationDrivePath))
+             {
+                 goto PressAnyKeyToExit;
+             }
+             Console.WriteLine("Pushing all git repos...");
+             if (BackupGitRepos("", SourceDrivePath, DestinationDrivePath))
+             {
+                 goto PressAnyKeyToExit;
+             }
+             Console.WriteLine("Backing up files...");
+             if (Backup("", SourceDrivePath, DestinationDrivePath))
+             {
+                 goto PressAnyKeyToExit;
+             }
             Console.WriteLine("Pruning removed files...");
             if (Prune("", SourceDrivePath, DestinationDrivePath))
             {
@@ -291,7 +291,14 @@ namespace BackupService
                 }
                 if (backup)
                 {
-                    File.Copy(sourceFile, destinationFile, true);
+                    try
+                    {
+                        File.Copy(sourceFile, destinationFile, true);
+                    }
+                    catch
+                    {
+
+                    }
                 }
             }
 
@@ -327,7 +334,14 @@ namespace BackupService
                 }
                 if (prune)
                 {
-                    Directory.Delete(destinationFolder, true);
+                    try
+                    {
+                        Directory.Delete(destinationFolder, true);
+                    }
+                    catch
+                    {
+
+                    }
                 }
             }
 
@@ -342,7 +356,14 @@ namespace BackupService
                 }
                 if (prune)
                 {
-                    File.Delete(destinationFile);
+                    try
+                    {
+                        File.Delete(destinationFile);
+                    }
+                    catch
+                    {
+
+                    }
                 }
             }
 
